@@ -73,7 +73,7 @@ fn build_v8() {
   }
 
   // On windows, rustc cannot link with a V8 debug build.
-  let mut gn_args = if cargo_gn::is_debug() && !cfg!(target_os = "windows") {
+  let mut gn_args = if cargo_gn::is_debug() && target_os() != "windows" {
     vec!["is_debug=true".to_string()]
   } else {
     vec!["is_debug=false".to_string()]
@@ -145,18 +145,17 @@ fn maybe_install_sysroot(arch: &str) {
   }
 }
 
+fn target_os() -> String {
+  env::var("CARGO_CFG_TARGET_OS").unwrap()
+}
+
 fn platform() -> &'static str {
-  #[cfg(target_os = "windows")]
-  {
-    "win"
-  }
-  #[cfg(target_os = "linux")]
-  {
-    "linux64"
-  }
-  #[cfg(target_os = "macos")]
-  {
-    "mac"
+  let target_os = target_os();
+  match target_os.as_str() {
+      "windows" => "win",
+      "linux" => "linux64",
+      "macos" => "mac",
+      _ => panic!("Unknown target os: {}", target_os),
   }
 }
 
@@ -193,9 +192,9 @@ fn static_lib_url() -> String {
     env::var("RUSTY_V8_MIRROR").unwrap_or_else(|_| default_base.into());
   let version = env::var("CARGO_PKG_VERSION").unwrap();
   let target = env::var("TARGET").unwrap();
-  if cfg!(target_os = "windows") {
+  if target_os() == "windows" {
     // Note: we always use the release build on windows.
-    format!("{}/v{}/rusty_v8_release_{}.lib", base, version, target)
+    format!("{}/v{}/rusty_v8_release_{}.lib", base, version, "x86_64-pc-windows-msvc")
   } else {
     let profile = env::var("PROFILE").unwrap();
     assert!(profile == "release" || profile == "debug");
@@ -204,7 +203,7 @@ fn static_lib_url() -> String {
 }
 
 fn static_lib_name() -> &'static str {
-  match cfg!(target_os = "windows") {
+  match target_os() == "windows" {
     true => "rusty_v8.lib",
     false => "librusty_v8.a",
   }
@@ -360,7 +359,7 @@ fn cc_wrapper(gn_args: &mut Vec<String>, sccache_path: &Path) {
   gn_args.push(format!("cc_wrapper={:?}", sccache_path));
   // Disable treat_warnings_as_errors until this sccache bug is fixed:
   // https://github.com/mozilla/sccache/issues/264
-  if cfg!(target_os = "windows") {
+  if target_os() == "windows" {
     gn_args.push("treat_warnings_as_errors=false".to_string());
   }
 }
